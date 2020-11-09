@@ -24,24 +24,11 @@ ggcortree <- function(x,
 
   n <- nrow(x)
 
-  x <- (1 - x)
-  htree <- stats::hclust(d = as.dist(x), method = "complete")
+  corcluster <- corclust(x = x, y = y, k = k)
+  htree <- corcluster$tree
+  k <- max(corcluster$clust)
 
-  if (!is.null(y))
-    htree <- reorder.hclust(x = htree, weights = y ^ 2, agglomerator = "max")
-
-  if (is.null(k)) {
-
-    kclust.test <- sapply(2:(n - 1), function(i) {
-      test <- min(table(cutree_order(tree = htree, k = i))) > 1
-      return(test)
-    })
-    k <- sum(kclust.test) + 1
-
-  }
-
-
-  hcdata <- dendro_data_k(hc = htree, k = k)
+  hcdata <- dendro_data_k(hc = htree, k = ifelse(k == 0, 1, k))
   if (is.null(y)) {
     hcdata$labels$size <- rep(x = 1, times = n)
   } else {
@@ -180,14 +167,14 @@ dendro_data_k <- function(hc, k) {
 
   hcdata <- ggdendro::dendro_data(hc, type = "rectangle")
   seg <- hcdata$segments
-  labclust <- stats::cutree(hc, k)[hc$order]
+  labclust <- cutree_order(hc, k)[hc$order]
   segclust <- rep(0L, nrow(seg))
   heights <- sort(hc$height, decreasing = TRUE)
   height <- mean(c(heights[k], heights[k - 1L]), na.rm = TRUE)
 
   for (i in 1:k) {
     xi <- hcdata$labels$x[labclust == i]
-    idx1 <- seg$x    >= min(xi) & seg$x    <= max(xi)
+    idx1 <- seg$x >= min(xi) & seg$x <= max(xi)
     idx2 <- seg$xend >= min(xi) & seg$xend <= max(xi)
     idx3 <- seg$yend < height
     idx <- idx1 & idx2 & idx3
@@ -231,110 +218,5 @@ set_labels_params <- function(
 
   params <- list(angle = angle, hjust = hjust, vjust = 0.5)
   return(params)
-
-}
-
-#' @author Jari Oksanen
-#' @noRd
-#' @note
-#' dsnavega:This functions was extracted from the vegan package.
-#' Function and variables have been renamed to match my style and personal taste
-#' but authorship of algorithm is given to Jari Oksanen.
-#' https://github.com/vegandevs/vegan/blob/master/R/as.hclust.spantree.R
-#'
-hclust_mergeorder <- function(merge) {
-
-  order <- numeric(nrow(merge) + 1)
-  index <- 0
-  visit <- function(i, j) {
-    if (merge[i,j] < 0) {
-      index <<- index + 1
-      order[index] <<- -merge[i, j]
-    } else {
-      visit(merge[i, j], 1)
-      visit(merge[i, j], 2)
-    }
-  }
-
-  visit(nrow(merge), 1)
-  visit(nrow(merge), 2)
-
-  return(order)
-
-}
-
-#' @author Jari Oksanen
-#' @noRd
-#' @note
-#' dsnavega:This functions was extracted from the vegan package.
-#' Function and variables have been renamed to match my style and personal taste
-#' but authorship of algorithm is given to Jari Oksanen.
-#' https://github.com/vegandevs/vegan/blob/master/R/as.hclust.spantree.R
-#'
-reorder.hclust <- function(x, weights,
-  agglomerator = c("mean", "min", "max", "sum", "uwmean"), ...
-) {
-
-  agglomerator <- match.arg(agglomerator)
-  merge <- x$merge
-  nlevel <- nrow(merge)
-  stats <- numeric(nlevel)
-  counts <- numeric(nlevel)
-  pair <- numeric(2)
-  pairw <- numeric(2)
-
-  for (i in 1:nlevel) {
-    for (j in 1:2) {
-      if (merge[i, j] < 0) {
-        pair[j] <- weights[-merge[i, j]]
-        pairw[j] <- 1
-      } else {
-        pair[j] <- stats[merge[i, j]]
-        pairw[j] <- counts[merge[i, j]]
-      }
-    }
-    merge[i,] <- merge[i, order(pair)]
-
-    stats[i] <- switch(agglomerator,
-      "mean" = weighted.mean(pair, pairw),
-      "min" = min(pair),
-      "max" = max(pair),
-      "sum" = sum(pair),
-      "uwmean" = mean(pair)
-    )
-    counts[i] <- sum(pairw)
-  }
-
-  order <- hclust_mergeorder(merge)
-  x$merge <- merge
-  x$order <- order
-  x$value <- stats
-
-  return(x)
-
-}
-
-#' @author Jari Oksanen
-#' @import stats
-#' @noRd
-#' @note
-#' dsnavega:This functions was extracted from the vegan package.
-#' Function and variables have been renamed to match my style and personal taste
-#' but authorship of algorithm is given to Jari Oksanen.
-#' https://github.com/vegandevs/vegan/blob/master/R/as.hclust.spantree.R
-#'
-cutree_order <- function(tree, k = NULL, h = NULL) {
-
-  cut <- stats::cutree(tree, k, h)
-  if (!is.matrix(cut)) {
-    cut <- order(unique(cut[tree$order]))[cut]
-    names(cut) <- tree$labels
-  } else {
-    for (i in seq_len(ncol(cut))) {
-      cut[, i] <- order(unique(cut[tree$order,i]))[cut[,i]]
-    }
-  }
-
-  return(cut)
 
 }

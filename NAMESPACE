@@ -2,6 +2,7 @@
 
 S3method(plot,gafs)
 S3method(print,gafs)
+export(corclust)
 export(cramer.test)
 export(eta)
 export(etasq.test)
